@@ -10,47 +10,56 @@ namespace AElf.RPC.Test
 {
     public class RPCTest
     {
-        private Task<SmartContract> Client(String className)
+
+        private Task<Server> StartUp(int port)
         {
-            // load data 
-            var data = File.ReadAllBytes("../../../contracts/Contract.dll");
-            var smartContractRegistration = new SmartContractReg {Byte = ByteString.CopyFrom(data), Name = className};
-            var channel = new Channel("127.0.0.1:50052", ChannelCredentials.Insecure);
-            
-            // create a real client
-            var smartContract = new SmartContract(new AElfRPC.AElfRPCClient(channel), smartContractRegistration);
-            return Task.FromResult(smartContract);
+           
+            Console.WriteLine("RPC server listening on port " + port);
+            // create a server
+            Server server = new Server
+            {
+                Services = { AElfRPC.BindService(new SmartContractExecution()) },
+                Ports = { new ServerPort("localhost", port, ServerCredentials.Insecure) }
+            };
+            server.Start();
+            return Task.FromResult(server);
+
         }
         
-        
         [Fact]
-        public void SimpleRPC()
+        public async Task SimpleRPC()
         {
-            var smartContract = Client("Contract.Contract").Result;
-            var res = smartContract.Invoke("HelloWorld", 1);
-            Console.WriteLine(res.Result.Res);
+            var server = await StartUp(50052);
+            RPCClient client = new RPCClient(50052);
+            client.SimpleRPC();
+            await server.ShutdownAsync();
         }
 
         [Fact]
         public async Task ServerSideStream()
         {
-            var smartContract = Client("Contract.ListContract").Result;
-            await smartContract.ListResults("WaitSecondsTwice", 2);
+            var server = await StartUp(50053);
+            RPCClient client = new RPCClient(50053);
+            await client.ServerSideStream();
+            await server.ShutdownAsync();
         }
-
 
         [Fact]
         public async Task ClientSideStream()
         {
-            var smartContract = Client("Contract.ListContract").Result;
-            await smartContract.ListInvoke("WaitSecondsTwice", 2);
+            var server = await StartUp(50054);
+            var client = new RPCClient(50054);
+            await client.ClientSideStream();
+            await server.ShutdownAsync();
         }
 
         [Fact]
         public async Task BiDirectional()
         {
-            var smartContract = Client("Contract.ListContract").Result;
-            await smartContract.BiDirectional("WaitSeconds", 2);
+            var server = await StartUp(50055);
+            var client = new RPCClient(50055);
+            await client.BiDirectional();
+            await server.ShutdownAsync();
         }
     }
 }
