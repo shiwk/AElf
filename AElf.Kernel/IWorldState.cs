@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using AElf.Kernel.Merkle;
+using System.Threading.Tasks;
 
 namespace AElf.Kernel
 {
@@ -8,16 +9,9 @@ namespace AElf.Kernel
     public interface IWorldState
     {
         /// <summary>
-        /// Get a data provider for an account to do further data operation 
-        /// </summary>
-        /// <param name="account"></param>
-        /// <returns></returns>
-        IAccountDataProvider GetAccountDataProviderByAccount(IAccount account);
-        
-        /// <summary>
         /// The merkle tree root presents the world state of a chain
         /// </summary>
         /// <returns></returns>
-        Task<IHash<IMerkleTree<IHash>>> GetWordStateMerkleTreeRootAsync();
+        Task<IHash> GetWorldStateMerkleTreeRootAsync();
     }
 }
