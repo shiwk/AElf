@@ -3,7 +3,7 @@ using System;
 
 namespace AElf.Kernel
 {
-    public class Block : IBlock
+    public class Block
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="T:AElf.Kernel.Block"/> class.
@@ -29,8 +29,8 @@ namespace AElf.Kernel
             return true;
         }
 
-        public IBlockHeader Header { get; set; }
-        public IBlockBody Body { get; set; }
+        public BlockHeader Header { get; set; }
+        public BlockBody Body { get; set; }
 
 
         /// <summary>

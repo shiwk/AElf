@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using AElf.Kernel.Extensions;
 using AElf.Kernel.Storages;
 
 namespace AElf.Kernel
@@ -18,7 +19,7 @@ namespace AElf.Kernel
         }
 
 
-        public async Task AppenBlockToChainAsync(Chain chain, Block block)
+        public async Task AppendBlockToChainAsync(Chain chain, Block block)
         {
             if (chain.CurrentBlockHash != block.Header.PreviousHash)
             {
@@ -26,7 +27,7 @@ namespace AElf.Kernel
             }
             
             chain.UpdateCurrentBlock(block);
-            await _relationStore.Insert(chain, block, chain.CurrentBlockHeight);
+            await _relationStore.InsertAsync(chain, block);
             await _chainStore.UpdateAsync(chain);
 
         }

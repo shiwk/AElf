@@ -1,24 +1,36 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using AElf.Kernel.Extensions;
 
 namespace AElf.Kernel.Storages
 {
     public interface ITransactionStore
     {
-        Task InsertAsync(ITransaction tx);
-        Task<ITransaction> GetAsync(IHash hash);
+        Task InsertAsync(Transaction tx);
+        Task<Transaction> GetAsync(Hash hash);
     }
     
-    public class TransactionStore: ITransactionStore
+    /// <summary>
+    /// Simply use a dictionary to store transactions.
+    /// </summary>
+    public class TransactionStore : ITransactionStore
     {
-        public Task InsertAsync(ITransaction tx)
+        private readonly IKeyValueDatabase _keyValueDatabase;
+
+        public TransactionStore(IKeyValueDatabase keyValueDatabase)
         {
-            //return Task.FromResult(0);
-            throw new System.NotImplementedException();
+            _keyValueDatabase = keyValueDatabase;
         }
 
-        public Task<ITransaction> GetAsync(IHash hash)
+        public async Task InsertAsync(Transaction tx)
         {
-            throw new System.NotImplementedException();
+            await _keyValueDatabase.SetAsync(tx.GetHash(), tx);
+        }
+
+        public async Task<Transaction> GetAsync(Hash hash)
+        {
+            return (Transaction) await _keyValueDatabase.GetAsync(hash);
         }
     }
 }
