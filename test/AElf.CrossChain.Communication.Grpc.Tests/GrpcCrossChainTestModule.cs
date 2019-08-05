@@ -18,20 +18,16 @@ namespace AElf.CrossChain.Communication.Grpc
             var services = context.Services;
             Configure<GrpcCrossChainConfigOption>(option =>
             {
+                option.ListeningHost = "127.0.0.1";
                 option.LocalServerPort = 5001;
                 option.LocalServerHost = "127.0.0.1";
                 option.RemoteParentChainServerHost = "127.0.0.1";
                 option.RemoteParentChainServerPort = 5000;
             });
-            
-            Configure<ChainOptions>(option =>
+
+            Configure<CrossChainConfigOptions>(option =>
             {
-                option.ChainId = ChainHelper.ConvertBase58ToChainId("AELF");
-            });
-            
-            services.AddTransient<IGrpcClientPlugin, GrpcCrossChainClientNodePlugin>();
-            services.AddTransient<IGrpcServePlugin, GrpcCrossChainServerNodePlugin>();
-            services.AddSingleton<IGrpcCrossChainServer, GrpcCrossChainServer>();
+                option.ParentChainId = ChainHelper.ConvertBase58ToChainId("AELF"); });
             services.AddSingleton<GrpcCrossChainClientNodePlugin>();
         }
     }

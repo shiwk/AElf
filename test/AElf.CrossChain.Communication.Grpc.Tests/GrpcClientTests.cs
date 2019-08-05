@@ -1,4 +1,6 @@
+using System;
 using System.Threading.Tasks;
+using Acs7;
 using Grpc.Core;
 using Shouldly;
 using Xunit;
@@ -9,47 +11,131 @@ namespace AElf.CrossChain.Communication.Grpc
     {
         private const string Host = "localhost";
         private const int ListenPort = 2200;
-        private BasicCrossChainRpc.BasicCrossChainRpcClient _basicClient;
-        
         private IGrpcCrossChainServer _server;
-        
+        private BasicCrossChainRpc.BasicCrossChainRpcClient _basicClient;
+        private GrpcCrossChainCommunicationTestHelper _grpcCrossChainCommunicationTestHelper;
+        private GrpcCrossChainClientService _grpcCrossChainClientService;
+        private GrpcCrossChainClientProvider _grpcCrossChainClientProvider;
+
         public GrpcClientTests()
         {
             _server = GetRequiredService<IGrpcCrossChainServer>();
+            _grpcCrossChainClientService = GetRequiredService<GrpcCrossChainClientService>();
+            _grpcCrossChainClientProvider = GetRequiredService<GrpcCrossChainClientProvider>();
+            _grpcCrossChainCommunicationTestHelper = GetRequiredService<GrpcCrossChainCommunicationTestHelper>();
         }
 
-        // TODO: These cases are meaningless and should be rewritten.
-//        [Fact]
-//        public async Task ParentChainClient_StartIndexingRequest_WithException()
-//        {
-//            await Assert.ThrowsAsync<RpcException>(()=>parentClient.StartIndexingRequest(0, 1, _crossChainDataProducer));  
-//        }
-//        
-//        [Fact(Skip = "Not meaningful at all.")]
-//        public async Task SideChainClient_StartIndexingRequest_WithException()
-//        {
-//            // is this meaningful? 
-//            await Assert.ThrowsAsync<RpcException>(()=>sideClient.StartIndexingRequest(0, 2, _crossChainDataProducer));
-//        }
-
         [Fact]
-        public async Task BasicCrossChainClient_TryHandShake()
+        public async Task BasicCrossChainClient_TryHandShake_Test()
         {
-            InitServerAndClient(5000);
+            await InitServerAndClientAsync(5000);
             var result = await _basicClient.CrossChainHandShakeAsync(new HandShake
             {
-                ListeningPort = 2100,
+                ListeningPort = ListenPort,
                 FromChainId = 0,
-                Host = "127.0.0.1"
+                Host = Host
             });
             result.Success.ShouldBeTrue();
             Dispose();
         }
-        
-        private void InitServerAndClient(int port)
+
+        [Fact]
+        public async Task GetClient_Test()
         {
-            _server.StartAsync(Host, port).Wait();
-            _basicClient = new BasicCrossChainRpc.BasicCrossChainRpcClient(new Channel(Host, port, ChannelCredentials.Insecure));
+            var remoteChainId = _chainOptions.ChainId;
+            var localChainId = ChainHelper.GetChainId(2);
+            await _server.StartAsync(Host, 5000);
+            CreateAndCacheClient(localChainId, false, 5000, remoteChainId);
+            var client = await _grpcCrossChainClientProvider.TryGetClient(remoteChainId);
+            Assert.True(client.RemoteChainId == remoteChainId);
+            Assert.True(client.TargetUriString.Equals("localhost:5000"));
+            Assert.True(client.IsConnected);
+            Dispose();
+        }
+
+        [Fact]
+        public async Task GetClientService_Test()
+        {
+            var remoteChainId = _chainOptions.ChainId;
+            var localChainId = ChainHelper.GetChainId(2);
+            await _server.StartAsync(Host, 5000);
+
+            var fakeCrossChainClient = new CrossChainClientDto
+            {
+                LocalChainId = localChainId,
+                RemoteChainId = remoteChainId,
+                IsClientToParentChain = false,
+                RemoteServerHost = Host,
+                RemoteServerPort = 5000
+            };
+
+            await _grpcCrossChainClientService.CreateClientAsync(fakeCrossChainClient);
+            var client = await _grpcCrossChainClientService.GetClientAsync(remoteChainId);
+            Assert.True(client.RemoteChainId == remoteChainId);
+            Assert.True(client.TargetUriString.Equals("localhost:5000"));
+            Assert.True(client.IsConnected);
+            Dispose();
+        }
+
+        [Fact]
+        public async Task RequestChainInitializationData_SideClient_Test()
+        {
+            var chainId = ChainHelper.GetChainId(1);
+            await _server.StartAsync(Host, 5000);
+            var client = CreateCrossChainClient(chainId, false);
+            await Assert.ThrowsAsync<NotImplementedException>(() =>
+                client.RequestChainInitializationDataAsync(chainId));
+            Dispose();
+        }
+
+        [Fact]
+        public async Task RequestChainInitializationData_ParentClient_Test()
+        {
+            var chainId = ChainHelper.GetChainId(1);
+            await _server.StartAsync(Host, 5000);
+            var res = await _grpcCrossChainClientService.RequestChainInitializationData(chainId);
+            Assert.True(res.CreationHeightOnParentChain == 1);
+            Dispose();
+        }
+
+        [Fact]
+        public async Task RequestCrossChainData_Test()
+        {
+            var localChainId = ChainHelper.GetChainId(1);
+            var remoteChainId = _chainOptions.ChainId;
+            var height = 2;
+            await _server.StartAsync(Host, 5000);
+            var client = CreateCrossChainClient(localChainId, false, remoteChainId);
+            _grpcCrossChainCommunicationTestHelper.GrpcCrossChainClients.TryAdd(remoteChainId, client);
+            await client.ConnectAsync();
+            _grpcCrossChainCommunicationTestHelper.FakeSideChainBlockDataEntityCacheOnServerSide(height);
+            await client.RequestCrossChainDataAsync(height);
+
+            Assert.True(
+                GrpcCrossChainCommunicationTestHelper.ClientBlockDataEntityCache.Contains(new SideChainBlockData
+                    {Height = height}));
+            Dispose();
+        }
+
+        private async Task InitServerAndClientAsync(int port)
+        {
+            await _server.StartAsync(Host, port);
+            _basicClient =
+                new BasicCrossChainRpc.BasicCrossChainRpcClient(new Channel(Host, port, ChannelCredentials.Insecure));
+        }
+
+        private ICrossChainClient CreateCrossChainClient(int chainId, bool toParenChain, int remoteChainId = 0)
+        {
+            var fakeCrossChainClient = new CrossChainClientDto
+            {
+                LocalChainId = chainId,
+                RemoteChainId = remoteChainId,
+                IsClientToParentChain = toParenChain,
+                RemoteServerHost = Host,
+                RemoteServerPort = 5000
+            };
+            var res = _grpcCrossChainClientProvider.CreateCrossChainClient(fakeCrossChainClient);
+            return res;
         }
 
         public override void Dispose()

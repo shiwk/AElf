@@ -104,6 +104,7 @@ namespace AElf.Contracts.CrossChain
             if (State.ParentChainId.Value == 0)
                 return dict;
             var parentChainHeight = GetParentChainHeight(new Empty()).Value;
+            Assert(parentChainHeight > Constants.GenesisBlockHeight, "Invalid parent chain height");
             dict.IdHeightDict.Add(State.ParentChainId.Value, parentChainHeight);
             return dict;
         }
@@ -138,7 +139,7 @@ namespace AElf.Contracts.CrossChain
         {
             var info = State.SideChainInfo[input.Value];
             Assert(info != null, "Side chain Not Found.");
-            Assert(info.SideChainStatus != (SideChainStatus) 3, "Disposed side chain.");
+            Assert(info.SideChainStatus != (SideChainStatus) 2, "Disposed side chain.");
             return new SInt64Value() {Value = info.SideChainCreationRequest.LockedTokenAmount};
         }
 
@@ -146,7 +147,7 @@ namespace AElf.Contracts.CrossChain
         {
             var info = State.SideChainInfo[input.Value];
             Assert(info != null, "Not existed side chain.");
-            Assert(info.SideChainStatus != (SideChainStatus) 3, "Disposed side chain.");
+            Assert(info.SideChainStatus != (SideChainStatus) 2, "Disposed side chain.");
             return info.Proposer;
         }
 
@@ -154,7 +155,6 @@ namespace AElf.Contracts.CrossChain
         {
             var sideChainInfo = State.SideChainInfo[chainId.Value];
             Assert(sideChainInfo != null, "Side chain Not Found.");
-            Assert(sideChainInfo.SideChainStatus == SideChainStatus.Active, "Incorrect side chain status.");
             var res = new ChainInitializationData
             {
                 CreationHeightOnParentChain = sideChainInfo.CreationHeightOnParentChain,

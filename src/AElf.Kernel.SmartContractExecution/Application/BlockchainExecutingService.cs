@@ -44,7 +44,7 @@ namespace AElf.Kernel.SmartContractExecution.Application
             if (blockState != null)
                 return true;
 
-            var transactions = await _blockchainService.GetTransactionsAsync(block.TransactionHashList);
+            var transactions = await _blockchainService.GetTransactionsAsync(block.TransactionIds);
             var executedBlock = await _blockExecutingService.ExecuteBlockAsync(block.Header, transactions);
 
             return executedBlock.GetHashWithoutCache().Equals(blockHash);
@@ -137,8 +137,6 @@ namespace AElf.Kernel.SmartContractExecution.Application
             {
                 if (!(ex.InnerException is ValidateNextTimeBlockValidationException) || successLinks.Count == 0)
                 {
-                    Logger.LogWarning($"Block validation failed: {ex.Message}.");
-                    Logger.LogWarning("Delete longest chain..");
                     await _chainManager.RemoveLongestBranchAsync(chain);
                     throw;
                 }
