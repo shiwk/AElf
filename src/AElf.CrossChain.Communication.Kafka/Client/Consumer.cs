@@ -9,6 +9,7 @@ namespace AElf.CrossChain.Communication.Kafka.Client
         public int RemoteChainId { get; }
         public string TargetUriString { get; }
         public bool IsConnected { get; }
+        
         public Task RequestCrossChainDataAsync(long targetHeight)
         {
             throw new System.NotImplementedException();
