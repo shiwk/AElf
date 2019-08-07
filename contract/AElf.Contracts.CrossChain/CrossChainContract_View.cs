@@ -43,7 +43,7 @@ namespace AElf.Contracts.CrossChain
         public override SInt32Value GetChainStatus(SInt32Value input)
         {
             var info = State.SideChainInfo[input.Value];
-            Assert(info != null, "Not existed side chain.");
+            Assert(info != null, "Side chain not found.");
             return new SInt32Value() {Value = (int) info.SideChainStatus};
         }
 
@@ -75,7 +75,7 @@ namespace AElf.Contracts.CrossChain
         {
             var chainId = input.Value;
             var sideChainInfo = State.SideChainInfo[chainId];
-            Assert(sideChainInfo != null, "Not existed side chain.");
+            Assert(sideChainInfo != null, "Side chain not found.");
             Assert(Context.Sender.Equals(sideChainInfo.Proposer), "Unable to check balance.");
             return new SInt64Value() {Value = State.IndexingBalance[chainId]};
         }
@@ -138,23 +138,23 @@ namespace AElf.Contracts.CrossChain
         public override SInt64Value LockedToken(SInt32Value input)
         {
             var info = State.SideChainInfo[input.Value];
-            Assert(info != null, "Side chain Not Found.");
-            Assert(info.SideChainStatus != (SideChainStatus) 2, "Disposed side chain.");
+            Assert(info != null, "Side chain not found.");
+            Assert(info.SideChainStatus != SideChainStatus.Terminated, "Disposed side chain.");
             return new SInt64Value() {Value = info.SideChainCreationRequest.LockedTokenAmount};
         }
 
         public override Address LockedAddress(SInt32Value input)
         {
             var info = State.SideChainInfo[input.Value];
-            Assert(info != null, "Not existed side chain.");
-            Assert(info.SideChainStatus != (SideChainStatus) 2, "Disposed side chain.");
+            Assert(info != null, "Side chain not found.");
+            Assert(info.SideChainStatus != SideChainStatus.Terminated, "Disposed side chain.");
             return info.Proposer;
         }
 
         public override ChainInitializationData GetChainInitializationData(SInt32Value chainId)
         {
             var sideChainInfo = State.SideChainInfo[chainId.Value];
-            Assert(sideChainInfo != null, "Side chain Not Found.");
+            Assert(sideChainInfo != null, "Side chain not found.");
             var res = new ChainInitializationData
             {
                 CreationHeightOnParentChain = sideChainInfo.CreationHeightOnParentChain,
