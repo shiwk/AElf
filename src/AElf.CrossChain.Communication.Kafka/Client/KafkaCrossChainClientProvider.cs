@@ -7,15 +7,8 @@ namespace AElf.CrossChain.Communication.Kafka
 {
     public class KafkaCrossChainClientProvider : ICrossChainClientProvider, ISingletonDependency
     {
-        private readonly Dictionary<int, ICrossChainClient> _clients = new Dictionary<int, ICrossChainClient>();
-        private readonly IBlockCacheEntityProducer _blockCacheEntityProducer;
 
-        public KafkaCrossChainClientProvider(IBlockCacheEntityProducer blockCacheEntityProducer)
-        {
-            _blockCacheEntityProducer = blockCacheEntityProducer;
-        }
-
-        public ICrossChainClient CreateAndCacheClient(CrossChainClientDto crossChainClientDto)
+        public ICrossChainClient AddOrUpdateClient(CrossChainClientDto crossChainClientDto)
         {
             throw new System.NotImplementedException();
         }
