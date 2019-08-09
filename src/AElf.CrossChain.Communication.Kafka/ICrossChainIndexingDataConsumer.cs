@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace AElf.CrossChain.Communication.Kafka
 {
-    public interface ICrossChainConsumer
+    public interface ICrossChainIndexingDataConsumer
     {
         Task SubscribeAsync(IEnumerable<string> topics);
         Task CloseAsync();

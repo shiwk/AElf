@@ -4,7 +4,7 @@ using Confluent.Kafka;
 
 namespace AElf.CrossChain.Communication.Kafka
 {
-    public class CrossChainConsumer : ICrossChainConsumer
+    public class CrossChainIndexingDataConsumer : ICrossChainIndexingDataConsumer
     {
         
     }
