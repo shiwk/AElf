@@ -7,6 +7,12 @@ namespace AElf.CrossChain.Communication.Kafka
 {
     public class KafkaCrossChainClientProvider : ICrossChainClientProvider, ISingletonDependency
     {
+        private readonly IKafkaCrossChainBlockDataConsumerProvider _kafkaCrossChainBlockDataConsumerProvider;
+
+        public KafkaCrossChainClientProvider(IKafkaCrossChainBlockDataConsumerProvider kafkaCrossChainBlockDataConsumerProvider)
+        {
+            _kafkaCrossChainBlockDataConsumerProvider = kafkaCrossChainBlockDataConsumerProvider;
+        }
 
         public ICrossChainClient AddOrUpdateClient(CrossChainClientDto crossChainClientDto)
         {
