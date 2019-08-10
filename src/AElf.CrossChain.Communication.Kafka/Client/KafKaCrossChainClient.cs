@@ -21,7 +21,6 @@ namespace AElf.CrossChain.Communication.Kafka.Client
             TargetUriString = string.Join(":", host, port);
             RemoteChainId = chainId;
             _kafkaCrossChainConsumer = new KafkaCrossChainConsumer(TargetUriString);
-            _kafkaCrossChainConsumer.SubscribeCrossChainBlockData(RemoteChainId);
         }
         
         public void SetCrossChainBlockDataEntityHandler(Func<IBlockCacheEntity, bool> crossChainBlockDataEntityHandler)
