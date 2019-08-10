@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Acs7;
 using AElf.CrossChain.Cache;
@@ -9,7 +10,7 @@ namespace AElf.CrossChain.Communication.Kafka
 {
     public class KafkaCrossChainConsumer : IKafkaCrossChainConsumer
     {
-        private ConsumerConfig _consumerConfig;
+        private readonly ConsumerConfig _consumerConfig;
         private IConsumer<Ignore, string> _consumer;
         
         public KafkaCrossChainConsumer(string broker)
@@ -27,14 +28,36 @@ namespace AElf.CrossChain.Communication.Kafka
             _consumer = new ConsumerBuilder<Ignore, string>(_consumerConfig).Build();
         }
 
-        public void SubscribeCrossChainBlockData(int chainId)
+        public Task SubscribeCrossChainBlockDataAsync(int chainId)
         {
-            _consumer.
+            DoRequest(() =>
+            {
+                _consumer = new ConsumerBuilder<Ignore, string>(_consumerConfig).Build();
+                _consumer.Subscribe(ChainHelper.ConvertChainIdToBase58(chainId));
+            });
+            return Task.CompletedTask;
         }
 
-        public Task<List<IBlockCacheEntity>> ConsumeCrossChainBlockDataAsync(long targetHeight)
+        public Task ConsumeCrossChainBlockDataAsync(long targetHeight, CancellationTokenSource cts, 
+            Func<IBlockCacheEntity, bool> consumerHandler)
         {
-            throw new System.NotImplementedException();
+            var res = new List<IBlockCacheEntity>();
+            DoRequest(() =>
+            {
+                while (res.Count < CrossChainCommunicationConstants.MaximalIndexingCount)
+                {
+                    var consumeResult = _consumer.Consume(cts.Token);
+                    if (consumeResult.IsPartitionEOF)
+                    {
+                        break;
+                    }
+
+                    if (!consumerHandler(consumeResult.Value))
+                        break;
+                }
+            });
+
+            return Task.FromResult(res);
         }
 
         public Task<ChainInitializationData> ConsumeCrossChainInitializationData(int chainId)
@@ -42,9 +65,22 @@ namespace AElf.CrossChain.Communication.Kafka
             throw new System.NotImplementedException();
         }
 
-        public Task CloseAsync()
+        public void Close()
         {
-            throw new System.NotImplementedException();
+            _consumer?.Close();
+        }
+        
+        private void DoRequest(Action request)
+        {
+            try
+            {
+                request();
+            }
+            catch (KafkaException)
+            {
+                Close();
+                throw;
+            }
         }
     }
 }

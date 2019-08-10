@@ -1,8 +1,10 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Acs7;
 using AElf.CrossChain.Cache;
 using AElf.CrossChain.Communication.Infrastructure;
+using Confluent.Kafka;
 
 namespace AElf.CrossChain.Communication.Kafka.Client
 {
@@ -16,11 +18,14 @@ namespace AElf.CrossChain.Communication.Kafka.Client
 
         private readonly IKafkaCrossChainConsumer _kafkaCrossChainConsumer;
 
-        public KafKaCrossChainClient(string host, int port, int chainId)
+        private readonly int _consumeTimeoutInMilliSeconds;
+        
+        public KafKaCrossChainClient(string host, int port, int chainId, int consumeTimeoutInMilliSeconds)
         {
             TargetUriString = string.Join(":", host, port);
             RemoteChainId = chainId;
             _kafkaCrossChainConsumer = new KafkaCrossChainConsumer(TargetUriString);
+            _consumeTimeoutInMilliSeconds = consumeTimeoutInMilliSeconds;
         }
         
         public void SetCrossChainBlockDataEntityHandler(Func<IBlockCacheEntity, bool> crossChainBlockDataEntityHandler)
@@ -30,10 +35,10 @@ namespace AElf.CrossChain.Communication.Kafka.Client
 
         public async Task RequestCrossChainDataAsync(long targetHeight)
         {
-            var crossChainBlockDataList = await _kafkaCrossChainConsumer.ConsumeCrossChainBlockDataAsync(targetHeight);
-            foreach (var blockCacheEntity in crossChainBlockDataList)
+            using (var cts = new CancellationTokenSource(_consumeTimeoutInMilliSeconds))
             {
-                _crossChainBlockDataEntityHandler(blockCacheEntity);
+                await _kafkaCrossChainConsumer.ConsumeCrossChainBlockDataAsync(targetHeight, cts,
+                    _crossChainBlockDataEntityHandler);
             }
         }
 
@@ -42,17 +47,17 @@ namespace AElf.CrossChain.Communication.Kafka.Client
             return await _kafkaCrossChainConsumer.ConsumeCrossChainInitializationData(chainId);
         }
 
-        public Task ConnectAsync()
+        public async Task ConnectAsync()
         {
-            _kafkaCrossChainConsumer.SubscribeCrossChainBlockData(RemoteChainId);
+            await _kafkaCrossChainConsumer.SubscribeCrossChainBlockDataAsync(RemoteChainId);
             IsConnected = true;
-            return Task.CompletedTask;
         }
 
-        public async Task CloseAsync()
+        public Task CloseAsync()
         {
             IsConnected = false;
-            await _kafkaCrossChainConsumer.CloseAsync();
+            _kafkaCrossChainConsumer.Close();
+            return Task.CompletedTask;
         }
     }
 }

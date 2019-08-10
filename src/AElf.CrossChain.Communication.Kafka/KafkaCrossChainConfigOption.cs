@@ -4,5 +4,6 @@ namespace AElf.CrossChain.Communication.Kafka
     {
         public string BrokerHost { get; set; }
         public int BrokerPort { get; set; }
+        public int ConsumeTimeout { get; set; } = 500;
     }
 }
