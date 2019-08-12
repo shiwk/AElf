@@ -4,28 +4,28 @@ using System.Threading.Tasks;
 using Acs7;
 using AElf.CrossChain.Cache;
 using AElf.CrossChain.Communication.Infrastructure;
-using Confluent.Kafka;
+using Google.Protobuf;
 
 namespace AElf.CrossChain.Communication.Kafka.Client
 {
-    public class KafKaCrossChainClient : ICrossChainClient
+    public abstract class KafKaCrossChainClient<T> : ICrossChainClient where T : IMessage<T>, IBlockCacheEntity, new()
     {
         public int RemoteChainId { get; }
         public string TargetUriString { get; }
-        public bool IsConnected { get; private set; }
+        public bool IsConnected => KafkaCrossChainConsumer.IsAlive;
 
         private Func<IBlockCacheEntity, bool> _crossChainBlockDataEntityHandler;
 
-        private readonly IKafkaCrossChainConsumer _kafkaCrossChainConsumer;
+        protected readonly IKafkaCrossChainConsumer KafkaCrossChainConsumer;
 
-        private readonly int _consumeTimeoutInMilliSeconds;
-        
-        public KafKaCrossChainClient(string host, int port, int chainId, int consumeTimeoutInMilliSeconds)
+        protected readonly int ConsumeTimeoutInMilliSeconds;
+
+        protected KafKaCrossChainClient(string host, int port, int chainId, int consumeTimeoutInMilliSeconds)
         {
             TargetUriString = string.Join(":", host, port);
             RemoteChainId = chainId;
-            _kafkaCrossChainConsumer = new KafkaCrossChainConsumer(TargetUriString);
-            _consumeTimeoutInMilliSeconds = consumeTimeoutInMilliSeconds;
+            KafkaCrossChainConsumer = new KafkaCrossChainConsumer<T>(TargetUriString);
+            ConsumeTimeoutInMilliSeconds = consumeTimeoutInMilliSeconds;
         }
         
         public void SetCrossChainBlockDataEntityHandler(Func<IBlockCacheEntity, bool> crossChainBlockDataEntityHandler)
@@ -35,29 +35,64 @@ namespace AElf.CrossChain.Communication.Kafka.Client
 
         public async Task RequestCrossChainDataAsync(long targetHeight)
         {
-            using (var cts = new CancellationTokenSource(_consumeTimeoutInMilliSeconds))
+            using (var cts = new CancellationTokenSource(ConsumeTimeoutInMilliSeconds))
             {
-                await _kafkaCrossChainConsumer.ConsumeCrossChainBlockDataAsync(targetHeight, cts,
+                await KafkaCrossChainConsumer.ConsumeCrossChainBlockDataAsync(targetHeight, cts,
                     _crossChainBlockDataEntityHandler);
             }
         }
 
-        public async Task<ChainInitializationData> RequestChainInitializationDataAsync(int chainId)
+        public abstract Task<ChainInitializationData> RequestChainInitializationDataAsync(int chainId);
+
+        protected virtual async Task SubscribeTopicsAsync()
         {
-            return await _kafkaCrossChainConsumer.ConsumeCrossChainInitializationData(chainId);
+            await KafkaCrossChainConsumer.SubscribeCrossChainBlockDataTopicAsync(RemoteChainId);
         }
 
         public async Task ConnectAsync()
         {
-            await _kafkaCrossChainConsumer.SubscribeCrossChainBlockDataAsync(RemoteChainId);
-            IsConnected = true;
+            await SubscribeTopicsAsync();
         }
 
         public Task CloseAsync()
         {
-            IsConnected = false;
-            _kafkaCrossChainConsumer.Close();
+            KafkaCrossChainConsumer.Close();
             return Task.CompletedTask;
+        }
+    }
+
+    public sealed class KafkaClientForParentChain : KafKaCrossChainClient<ParentChainBlockData>
+    {
+        public KafkaClientForParentChain(string host, int port, int chainId, int consumeTimeoutInMilliSeconds) 
+            : base(host, port, chainId, consumeTimeoutInMilliSeconds)
+        {
+        }
+        
+        public override async Task<ChainInitializationData> RequestChainInitializationDataAsync(int chainId)
+        {
+            using (var cts = new CancellationTokenSource(ConsumeTimeoutInMilliSeconds))
+            {
+                return await KafkaCrossChainConsumer.ConsumeCrossChainInitializationData(chainId, cts);
+            }
+        }
+
+        protected override async Task SubscribeTopicsAsync()
+        {
+            await base.SubscribeTopicsAsync();
+            await KafkaCrossChainConsumer.SubscribeChainInitializationDataTopicAsync(RemoteChainId);
+        }
+    }
+
+    public sealed class KafkaClientForSideChain : KafKaCrossChainClient<SideChainBlockData>
+    {
+        public KafkaClientForSideChain(string host, int port, int chainId, int consumeTimeoutInMilliSeconds) 
+            : base(host, port, chainId, consumeTimeoutInMilliSeconds)
+        {
+        }
+
+        public override Task<ChainInitializationData> RequestChainInitializationDataAsync(int chainId)
+        {
+            throw new NotImplementedException();
         }
     }
 }

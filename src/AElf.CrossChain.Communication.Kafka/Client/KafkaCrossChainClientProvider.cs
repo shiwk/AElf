@@ -42,10 +42,15 @@ namespace AElf.CrossChain.Communication.Kafka
 
         public ICrossChainClient CreateCrossChainClient(CrossChainClientDto crossChainClientDto)
         {
-            return new KafKaCrossChainClient(_kafkaCrossChainConfigOption.BrokerHost,
-                _kafkaCrossChainConfigOption.BrokerPort, crossChainClientDto.RemoteChainId);
+            if (crossChainClientDto.IsClientToParentChain)
+                return new KafkaClientForParentChain(_kafkaCrossChainConfigOption.BrokerHost,
+                    _kafkaCrossChainConfigOption.BrokerPort, crossChainClientDto.RemoteChainId,
+                    _kafkaCrossChainConfigOption.ConsumeTimeout);
+            return new KafkaClientForSideChain(_kafkaCrossChainConfigOption.BrokerHost,
+                _kafkaCrossChainConfigOption.BrokerPort, crossChainClientDto.RemoteChainId,
+                _kafkaCrossChainConfigOption.ConsumeTimeout);
         }
-
+        
         public List<ICrossChainClient> GetAllClients()
         {
             return _kafkaCrossChainClients.Values.ToList();

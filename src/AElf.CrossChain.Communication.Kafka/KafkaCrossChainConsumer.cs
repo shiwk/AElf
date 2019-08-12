@@ -5,13 +5,16 @@ using System.Threading.Tasks;
 using Acs7;
 using AElf.CrossChain.Cache;
 using Confluent.Kafka;
+using Google.Protobuf;
 
 namespace AElf.CrossChain.Communication.Kafka
 {
-    public class KafkaCrossChainConsumer : IKafkaCrossChainConsumer
+    public class KafkaCrossChainConsumer<T> : IKafkaCrossChainConsumer where T : IMessage<T>, IBlockCacheEntity, new()
     {
         private readonly ConsumerConfig _consumerConfig;
-        private IConsumer<Ignore, string> _consumer;
+        private IConsumer<Ignore, T> _crossChainBlockDataConsumer;
+        private IConsumer<Ignore, ChainInitializationData> _chainInitializationDataConsumer;
+        public bool IsAlive { get; private set; }
         
         public KafkaCrossChainConsumer(string broker)
         {
@@ -25,62 +28,97 @@ namespace AElf.CrossChain.Communication.Kafka
                 AutoOffsetReset = AutoOffsetReset.Earliest,
                 EnablePartitionEof = true
             };
-            _consumer = new ConsumerBuilder<Ignore, string>(_consumerConfig).Build();
         }
 
-        public Task SubscribeCrossChainBlockDataAsync(int chainId)
+        public async Task SubscribeCrossChainBlockDataTopicAsync(int chainId)
         {
-            DoRequest(() =>
+            await DoRequestAsync(() =>
             {
-                _consumer = new ConsumerBuilder<Ignore, string>(_consumerConfig).Build();
-                _consumer.Subscribe(ChainHelper.ConvertChainIdToBase58(chainId));
+                _crossChainBlockDataConsumer = new ConsumerBuilder<Ignore, T>(_consumerConfig).SetValueDeserializer(new ProtobufKafkaDeserializer<T>()).Build();
+                _crossChainBlockDataConsumer.Subscribe(ChainHelper.ConvertChainIdToBase58(chainId));
             });
-            return Task.CompletedTask;
+            IsAlive = true;
         }
 
-        public Task ConsumeCrossChainBlockDataAsync(long targetHeight, CancellationTokenSource cts, 
+        public async Task SubscribeChainInitializationDataTopicAsync(int chainId)
+        {
+            await DoRequestAsync(() =>
+            {
+                _chainInitializationDataConsumer = new ConsumerBuilder<Ignore, ChainInitializationData>(_consumerConfig)
+                    .SetValueDeserializer(new ProtobufKafkaDeserializer<ChainInitializationData>()).Build();
+                _chainInitializationDataConsumer.Subscribe(ChainHelper.ConvertChainIdToBase58(chainId));
+            });
+            IsAlive = true;
+        }
+        
+        public async Task ConsumeCrossChainBlockDataAsync(long targetHeight, CancellationTokenSource cts, 
             Func<IBlockCacheEntity, bool> consumerHandler)
         {
-            var res = new List<IBlockCacheEntity>();
-            DoRequest(() =>
+            void RequestFunc()
             {
-                while (res.Count < CrossChainCommunicationConstants.MaximalIndexingCount)
+                var i = 0;
+                while (i++ < CrossChainCommunicationConstants.MaximalIndexingCount)
                 {
-                    var consumeResult = _consumer.Consume(cts.Token);
+                    var consumeResult = _crossChainBlockDataConsumer.Consume(cts.Token);
                     if (consumeResult.IsPartitionEOF)
                     {
                         break;
                     }
 
-                    if (!consumerHandler(consumeResult.Value))
-                        break;
+                    if (!consumerHandler(consumeResult.Value)) break;
                 }
-            });
+            }
 
-            return Task.FromResult(res);
+            _ = DoRequestAsync(RequestFunc);
         }
 
-        public Task<ChainInitializationData> ConsumeCrossChainInitializationData(int chainId)
+        public async Task<ChainInitializationData> ConsumeCrossChainInitializationData(int chainId,
+            CancellationTokenSource cts)
         {
-            throw new System.NotImplementedException();
+            ChainInitializationData chainInitializationData = null;
+
+            void RequestFunc()
+            {
+                var consumeResult = _chainInitializationDataConsumer.Consume(cts.Token);
+                if (consumeResult.IsPartitionEOF)
+                {
+                    chainInitializationData = null;
+                }
+
+                chainInitializationData = consumeResult.Value;
+            }
+
+            _ = DoRequestAsync(RequestFunc);
+            return chainInitializationData;
         }
 
         public void Close()
         {
-            _consumer?.Close();
+            IsAlive = false;
+            _crossChainBlockDataConsumer?.Close();
         }
         
-        private void DoRequest(Action request)
+        private async Task DoRequestAsync(Action request)
         {
             try
             {
-                request();
+                await Task.Run(request);
             }
             catch (KafkaException)
             {
                 Close();
                 throw;
             }
+        }
+    }
+
+    internal class ProtobufKafkaDeserializer<T> : IDeserializer<T> where T : IMessage<T>, new()
+    {
+        public T Deserialize(ReadOnlySpan<byte> data, bool isNull, SerializationContext context)
+        {
+            var obj = new T();
+            obj.MergeFrom(data.ToArray());
+            return obj;
         }
     }
 }

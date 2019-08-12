@@ -1,10 +1,10 @@
 using System.Threading.Tasks;
-using Acs7;
 using AElf.CrossChain.Communication.Application;
+using Volo.Abp.DependencyInjection;
 
 namespace AElf.CrossChain.Communication.Kafka
 {
-    public class KafkaCrossChainPlugin : IKafKaCrossChainPlugin
+    public class KafkaCrossChainPlugin : IKafKaCrossChainPlugin, ITransientDependency
     {
         private readonly ICrossChainClientService _crossChainClientService;
 
