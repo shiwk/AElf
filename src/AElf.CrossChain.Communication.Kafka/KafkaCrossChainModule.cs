@@ -14,7 +14,7 @@ namespace AElf.CrossChain.Communication.Kafka
             services.AddSingleton<INodePlugin, KafkaCrossChainPlugin>();
             
             var grpcCrossChainConfiguration = services.GetConfiguration().GetSection("CrossChain");
-            Configure<KafkaCrossChainConfigOption>(grpcCrossChainConfiguration.GetSection("Kafka"));
+            Configure<KafkaCrossChainConfigOptions>(grpcCrossChainConfiguration.GetSection("Kafka"));
         }
     }
 }

@@ -11,21 +11,19 @@ namespace AElf.CrossChain.Communication.Kafka.Client
     public abstract class KafKaCrossChainClient<T> : ICrossChainClient where T : IMessage<T>, IBlockCacheEntity, new()
     {
         public int RemoteChainId { get; }
-        public string TargetUriString { get; }
+        public string TargetUriString => KafkaCrossChainConsumer.Broker;
         public bool IsConnected => KafkaCrossChainConsumer.IsAlive;
 
         private Func<IBlockCacheEntity, bool> _crossChainBlockDataEntityHandler;
 
         protected readonly IKafkaCrossChainConsumer KafkaCrossChainConsumer;
 
-        protected readonly int ConsumeTimeoutInMilliSeconds;
+        protected readonly int ConsumeTimeoutInMilliSeconds = KafkaCrossChainConstants.ConsumeTimeoutMilliSeconds;
 
-        protected KafKaCrossChainClient(string host, int port, int chainId, int consumeTimeoutInMilliSeconds)
+        protected KafKaCrossChainClient(IKafkaCrossChainConsumer kafkaCrossChainConsumer, int chainId)
         {
-            TargetUriString = string.Join(":", host, port);
             RemoteChainId = chainId;
-            KafkaCrossChainConsumer = new KafkaCrossChainConsumer<T>(TargetUriString);
-            ConsumeTimeoutInMilliSeconds = consumeTimeoutInMilliSeconds;
+            KafkaCrossChainConsumer = kafkaCrossChainConsumer;
         }
         
         public void SetCrossChainBlockDataEntityHandler(Func<IBlockCacheEntity, bool> crossChainBlockDataEntityHandler)
@@ -63,8 +61,8 @@ namespace AElf.CrossChain.Communication.Kafka.Client
 
     public sealed class KafkaClientForParentChain : KafKaCrossChainClient<ParentChainBlockData>
     {
-        public KafkaClientForParentChain(string host, int port, int chainId, int consumeTimeoutInMilliSeconds) 
-            : base(host, port, chainId, consumeTimeoutInMilliSeconds)
+        public KafkaClientForParentChain(IKafkaCrossChainConsumer kafkaCrossChainConsumer, int chainId) 
+            : base(kafkaCrossChainConsumer, chainId)
         {
         }
         
@@ -85,8 +83,8 @@ namespace AElf.CrossChain.Communication.Kafka.Client
 
     public sealed class KafkaClientForSideChain : KafKaCrossChainClient<SideChainBlockData>
     {
-        public KafkaClientForSideChain(string host, int port, int chainId, int consumeTimeoutInMilliSeconds) 
-            : base(host, port, chainId, consumeTimeoutInMilliSeconds)
+        public KafkaClientForSideChain(IKafkaCrossChainConsumer kafkaCrossChainConsumer, int chainId) 
+            : base(kafkaCrossChainConsumer, chainId)
         {
         }
 

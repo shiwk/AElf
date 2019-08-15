@@ -10,6 +10,7 @@ namespace AElf.CrossChain.Communication.Kafka
     public interface IKafkaCrossChainConsumer
     {
         bool IsAlive { get; }
+        string Broker { get; }
         Task SubscribeCrossChainBlockDataTopicAsync(int chainId);
         Task SubscribeChainInitializationDataTopicAsync(int chainId);
         

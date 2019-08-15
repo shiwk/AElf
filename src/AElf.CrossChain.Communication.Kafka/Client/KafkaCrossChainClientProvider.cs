@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using Acs7;
 using AElf.CrossChain.Communication.Infrastructure;
 using AElf.CrossChain.Communication.Kafka.Client;
 using Microsoft.Extensions.Logging;
@@ -14,13 +15,19 @@ namespace AElf.CrossChain.Communication.Kafka
         private readonly ConcurrentDictionary<int, ICrossChainClient> _kafkaCrossChainClients =
             new ConcurrentDictionary<int, ICrossChainClient>();
 
-        private readonly KafkaCrossChainConfigOption _kafkaCrossChainConfigOption;
+        private readonly KafkaCrossChainConfigOptions _kafkaCrossChainConfigOptions;
+        private readonly IKafkaCrossChainConsumerFactory _kafkaCrossChainConsumerFactory;
 
+        private string KafkaCrossChainBroker { get; }
         public ILogger<KafkaCrossChainClientProvider> Logger { get; set; }
         
-        public KafkaCrossChainClientProvider(IOptionsSnapshot<KafkaCrossChainConfigOption> kafkaCrossChainConfigOption)
+        public KafkaCrossChainClientProvider(IOptionsSnapshot<KafkaCrossChainConfigOptions> kafkaCrossChainConfigOptionsSnapshot, 
+            IKafkaCrossChainConsumerFactory kafkaCrossChainConsumerFactory)
         {
-            _kafkaCrossChainConfigOption = kafkaCrossChainConfigOption.Value;
+            _kafkaCrossChainConsumerFactory = kafkaCrossChainConsumerFactory;
+            _kafkaCrossChainConfigOptions = kafkaCrossChainConfigOptionsSnapshot.Value;
+            KafkaCrossChainBroker = string.Join(":", _kafkaCrossChainConfigOptions.BrokerHost,
+                _kafkaCrossChainConfigOptions.BrokerPort);
         }
 
         public ICrossChainClient AddOrUpdateClient(CrossChainClientDto crossChainClientDto)
@@ -42,13 +49,19 @@ namespace AElf.CrossChain.Communication.Kafka
 
         public ICrossChainClient CreateCrossChainClient(CrossChainClientDto crossChainClientDto)
         {
+            IKafkaCrossChainConsumer consumer;
             if (crossChainClientDto.IsClientToParentChain)
-                return new KafkaClientForParentChain(_kafkaCrossChainConfigOption.BrokerHost,
-                    _kafkaCrossChainConfigOption.BrokerPort, crossChainClientDto.RemoteChainId,
-                    _kafkaCrossChainConfigOption.ConsumeTimeout);
-            return new KafkaClientForSideChain(_kafkaCrossChainConfigOption.BrokerHost,
-                _kafkaCrossChainConfigOption.BrokerPort, crossChainClientDto.RemoteChainId,
-                _kafkaCrossChainConfigOption.ConsumeTimeout);
+            {
+                consumer = _kafkaCrossChainConsumerFactory.Create<ParentChainBlockData>(
+                    ChainHelper.ConvertChainIdToBase58(crossChainClientDto.RemoteChainId), KafkaCrossChainBroker,
+                    false);
+                return new KafkaClientForParentChain(consumer, crossChainClientDto.RemoteChainId);
+            }
+            
+            consumer = _kafkaCrossChainConsumerFactory.Create<SideChainBlockData>(
+                ChainHelper.ConvertChainIdToBase58(crossChainClientDto.RemoteChainId), KafkaCrossChainBroker,
+                false);
+            return new KafkaClientForSideChain(consumer, crossChainClientDto.RemoteChainId);
         }
         
         public List<ICrossChainClient> GetAllClients()

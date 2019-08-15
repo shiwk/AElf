@@ -15,19 +15,11 @@ namespace AElf.CrossChain.Communication.Kafka
         private IConsumer<Ignore, T> _crossChainBlockDataConsumer;
         private IConsumer<Ignore, ChainInitializationData> _chainInitializationDataConsumer;
         public bool IsAlive { get; private set; }
-        
-        public KafkaCrossChainConsumer(string broker)
+        public string Broker => _consumerConfig.BootstrapServers;
+
+        public KafkaCrossChainConsumer(ConsumerConfig config)
         {
-            _consumerConfig = new ConsumerConfig
-            {
-                BootstrapServers = broker,
-                GroupId = "cross-chain",
-                EnableAutoCommit = false,
-                StatisticsIntervalMs = 5000,
-                SessionTimeoutMs = 6000,
-                AutoOffsetReset = AutoOffsetReset.Earliest,
-                EnablePartitionEof = true
-            };
+            _consumerConfig = config;
         }
 
         public async Task SubscribeCrossChainBlockDataTopicAsync(int chainId)
