@@ -80,9 +80,13 @@ message IndexedSideChainBlockData{
 
 message VerifyTransactionInput {
     aelf.Hash transaction_id = 1;
-    repeated aelf.Hash path = 2;
+    aelf.MerklePath path = 2;
     sint64 parent_chain_height = 3;
     int32 verified_chain_id = 4;
+}
+
+message IndexedChainHeightDict{
+    map<int32, int64> indexed_chain_heights = 1;
 }
 
 // Events
@@ -97,4 +101,10 @@ message Disposed {
     int32 chain_id = 1;
 }
 
+message ParentChainBlockDataIndexed{
+    option (aelf.is_event) = true;
+}
 
+message SideChainBlockDataIndexed{
+    option (aelf.is_event) = true;
+}

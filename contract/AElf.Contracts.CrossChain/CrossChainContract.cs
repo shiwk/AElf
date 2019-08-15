@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using AElf.Contracts.MultiToken.Messages;
 using AElf.Sdk.CSharp;
 using AElf.Types;
@@ -154,13 +153,18 @@ namespace AElf.Contracts.CrossChain
             //Assert(IsMiner(), "Not authorized to do this.");
             var indexedCrossChainData = State.IndexedSideChainBlockData[Context.CurrentHeight];
             Assert(indexedCrossChainData == null); // This should not fail.
-            
+
             var indexedParentChainBlockData = IndexParentChainBlockData(crossChainBlockData.ParentChainBlockData);
+            
+            State.LastIndexedParentChainBlockData.Value = indexedParentChainBlockData;
             if (indexedParentChainBlockData.ParentChainBlockData.Count > 0)
-                State.LastIndexedParentChainBlockData.Value = indexedParentChainBlockData;
+                Context.Fire(new ParentChainBlockDataIndexed());
             
             var indexedSideChainBlockData = IndexSideChainBlockData(crossChainBlockData.SideChainBlockData);
             State.IndexedSideChainBlockData[Context.CurrentHeight] = indexedSideChainBlockData;
+            
+            if (indexedSideChainBlockData.SideChainBlockData.Count > 0)
+                Context.Fire(new SideChainBlockDataIndexed());
             
             return new Empty();
         }
